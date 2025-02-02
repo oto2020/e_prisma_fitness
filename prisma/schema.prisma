@@ -1,0 +1,43 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Sale {
+  id           String   @id @db.VarChar(555)
+  datetime     DateTime?
+  division     String?
+  name         String?
+  client       String?
+  author       String?
+  trainer      String?
+  type         String?
+  order_count  Int?
+  order_price  Float?  
+  refund_count Int?
+  refund_price Float?
+  final_price  Float?
+
+  @@map("sales")
+}
+
+
+model Service {
+  id        String   @id @db.VarChar(555)
+  name      String?
+  division  String?
+  trainer   String?
+  client    String?
+  basis     String?
+  datetime  DateTime?
+  price     Float?
+
+  @@map("services")
+}

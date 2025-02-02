@@ -1,0 +1,5 @@
+делаем отчеты ftp.sales, ftp.services
+сохраняем в .xlsx в корень
+старые перемещаем в archive xlsx
+запускаем loadServices и loadSales
+далее можно выгружать отчет конверсий getConversionFT_VPT, проверив даты оказания услуг
