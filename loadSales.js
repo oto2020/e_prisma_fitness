@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const prisma = new PrismaClient();
-let isProcessing = false; // Флаг, чтобы предотвратить запуск нового цикла, если предыдущий не завершился
+let isProcessing = false; // Флаг, чтобы предотвратить повторные запуски
 
 async function loadSalesData(filePath) {
   const workbook = xlsx.readFile(filePath);
@@ -105,11 +105,14 @@ async function processFiles() {
   }
 }
 
+// 🔹 Запускаем сразу при запуске скрипта
+(async () => {
+  console.log("🚀 Первоначальный запуск обработки файлов...");
+  await processFiles();
+})();
+
 // 🔹 Запуск кода каждые 30 минут (1800000 миллисекунд)
 setInterval(processFiles, 30 * 60 * 1000); // 30 минут
-
-// 🔹 Запускаем сразу при запуске скрипта
-processFiles().catch(console.error);
 
 // 🔹 Обработчик завершения
 process.on('SIGINT', async () => {
