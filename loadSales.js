@@ -49,6 +49,16 @@ async function loadSalesData(filePath) {
     }
 
     console.log(`✅ Файл ${filePath} загружен.`);
+
+    // 🔹 Удаление файла после успешной загрузки
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error(`❌ Ошибка удаления файла ${filePath}:`, err);
+      } else {
+        console.log(`🗑️ Файл ${filePath} успешно удален.`);
+      }
+    });
+
   } catch (error) {
     console.error("❌ Ошибка при загрузке данных:", error);
   }
