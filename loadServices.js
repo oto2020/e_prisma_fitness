@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const prisma = new PrismaClient();
+let isProcessing = false; // Флаг для предотвращения одновременных запусков
 
 async function loadServicesData(filePath) {
   const workbook = xlsx.readFile(filePath);
@@ -24,14 +25,14 @@ async function loadServicesData(filePath) {
     price: Number(row.price)
   }));
 
-  console.log(`Подготовлено ${servicesData.length} записей.`);
+  console.log(`📄 Подготовлено ${servicesData.length} записей.`);
 
   try {
     // Очистка таблицы перед загрузкой новых данных
     await prisma.service.deleteMany({});
     console.log("✅ Все старые данные удалены.");
 
-    const batchSize = 500; // Вставка данных батчами по 500 записей
+    const batchSize = 500; // Вставка батчами по 500 записей
     for (let i = 0; i < servicesData.length; i += batchSize) {
       const batch = servicesData.slice(i, i + batchSize);
       console.log(`📤 Вставка записей: ${i + 1}-${i + batch.length} / ${servicesData.length}`);
@@ -48,33 +49,56 @@ async function loadServicesData(filePath) {
   }
 }
 
-async function main() {
-  const directoryPath = path.join(__dirname, "..", "ftp");
+async function processServiceFiles() {
+  if (isProcessing) {
+    console.log("⏳ Обработка уже выполняется, ждем следующего запуска...");
+    return;
+  }
 
-  fs.readdir(directoryPath, async (err, files) => {
-    if (err) {
-      return console.log('❌ Ошибка чтения директории: ' + err);
-    }
+  isProcessing = true; // Устанавливаем флаг обработки
 
-    const excelFiles = files.filter(file => file.startsWith('ftp.services') && file.endsWith('.xlsx'));
+  try {
+    const directoryPath = path.join(__dirname, "..", "ftp");
 
-    if (excelFiles.length === 0) {
-      console.log("❌ Файлы для загрузки не найдены.");
-      return;
-    }
+    fs.readdir(directoryPath, async (err, files) => {
+      if (err) {
+        console.error('❌ Ошибка чтения директории:', err);
+        isProcessing = false;
+        return;
+      }
 
-    console.log(`🔍 Найдено ${excelFiles.length} файлов для обработки.`);
+      const excelFiles = files.filter(file => file.startsWith('ftp.services') && file.endsWith('.xlsx'));
 
-    for (const file of excelFiles) {
-      await loadServicesData(path.join(directoryPath, file));
-    }
+      if (excelFiles.length === 0) {
+        console.log("📂 Файлы для загрузки не найдены.");
+        isProcessing = false;
+        return;
+      }
 
-    console.log('🎉 Все файлы обработаны.');
-  });
+      console.log(`🔍 Найдено ${excelFiles.length} файлов для обработки.`);
+
+      for (const file of excelFiles) {
+        await loadServicesData(path.join(directoryPath, file));
+      }
+
+      console.log('🎉 Все файлы обработаны.');
+      isProcessing = false; // Сбрасываем флаг после завершения обработки
+    });
+  } catch (error) {
+    console.error("❌ Ошибка обработки файлов:", error);
+    isProcessing = false;
+  }
 }
 
-main()
-  .catch(e => console.error(e))
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// 🔹 Запуск кода каждые 30 минут (1800000 миллисекунд)
+setInterval(processServiceFiles, 30 * 60 * 1000); // 30 минут
+
+// 🔹 Запускаем сразу при старте
+processServiceFiles().catch(console.error);
+
+// 🔹 Обработчик завершения
+process.on('SIGINT', async () => {
+  console.log("\n🛑 Завершаем работу...");
+  await prisma.$disconnect();
+  process.exit();
+});

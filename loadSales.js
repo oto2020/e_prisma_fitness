@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const prisma = new PrismaClient();
+let isProcessing = false; // Флаг, чтобы предотвратить запуск нового цикла, если предыдущий не завершился
 
 async function loadSalesData(filePath) {
   const workbook = xlsx.readFile(filePath);
@@ -29,7 +30,7 @@ async function loadSalesData(filePath) {
     final_price: row.final_price ? Number(row.final_price) : null
   }));
 
-  console.log(`Подготовлено ${salesData.length} записей.`);
+  console.log(`📄 Подготовлено ${salesData.length} записей.`);
 
   try {
     // Очистка таблицы перед вставкой данных
@@ -53,33 +54,56 @@ async function loadSalesData(filePath) {
   }
 }
 
-async function main() {
-  const directoryPath = path.join(__dirname, "..", "ftp");
+async function processFiles() {
+  if (isProcessing) {
+    console.log("⏳ Обработка уже выполняется, ждем следующего запуска...");
+    return;
+  }
 
-  fs.readdir(directoryPath, async (err, files) => {
-    if (err) {
-      return console.log('Ошибка чтения директории: ' + err);
-    }
+  isProcessing = true; // Устанавливаем флаг обработки
 
-    const excelFiles = files.filter(file => file.startsWith('ftp.sales') && file.endsWith('.xlsx'));
+  try {
+    const directoryPath = path.join(__dirname, "..", "ftp");
 
-    if (excelFiles.length === 0) {
-      console.log("❌ Файлы для загрузки не найдены.");
-      return;
-    }
+    fs.readdir(directoryPath, async (err, files) => {
+      if (err) {
+        console.error('❌ Ошибка чтения директории:', err);
+        isProcessing = false;
+        return;
+      }
 
-    console.log(`🔍 Найдено ${excelFiles.length} файлов для обработки.`);
+      const excelFiles = files.filter(file => file.startsWith('ftp.sales') && file.endsWith('.xlsx'));
 
-    for (const file of excelFiles) {
-      await loadSalesData(path.join(directoryPath, file));
-    }
+      if (excelFiles.length === 0) {
+        console.log("📂 Файлы для загрузки не найдены.");
+        isProcessing = false;
+        return;
+      }
 
-    console.log('🎉 Все файлы обработаны.');
-  });
+      console.log(`🔍 Найдено ${excelFiles.length} файлов для обработки.`);
+
+      for (const file of excelFiles) {
+        await loadSalesData(path.join(directoryPath, file));
+      }
+
+      console.log('🎉 Все файлы обработаны.');
+      isProcessing = false; // Сбрасываем флаг после завершения обработки
+    });
+  } catch (error) {
+    console.error("❌ Ошибка обработки файлов:", error);
+    isProcessing = false;
+  }
 }
 
-main()
-  .catch(e => console.error(e))
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// 🔹 Запуск кода каждые 30 минут (1800000 миллисекунд)
+setInterval(processFiles, 30 * 60 * 1000); // 30 минут
+
+// 🔹 Запускаем сразу при запуске скрипта
+processFiles().catch(console.error);
+
+// 🔹 Обработчик завершения
+process.on('SIGINT', async () => {
+  console.log("\n🛑 Завершаем работу...");
+  await prisma.$disconnect();
+  process.exit();
+});
