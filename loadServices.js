@@ -108,8 +108,8 @@ async function processServiceFiles() {
   await processServiceFiles();
 })();
 
-// 🔹 Запуск кода каждые 30 минут (1800000 миллисекунд)
-setInterval(processServiceFiles, 30 * 60 * 1000); // 30 минут
+// 🔹 Запуск кода каждую минуту
+setInterval(processServiceFiles, 60 * 1000); 
 
 // 🔹 Обработчик завершения
 process.on('SIGINT', async () => {
