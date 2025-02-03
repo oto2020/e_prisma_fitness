@@ -18,9 +18,11 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             conversationDays
         } = req.body;
 
-        if (!year || !month || !serviceName || !saleDivisions || !conversationDays) {
+        if (!year || !month || !serviceName || !saleDivisions.length || !conversationDays) {
             return res.status(400).json({ error: 'Missing required parameters' });
         }
+
+        const placeholders = saleDivisions.map(() => '?').join(', '); // Формируем ?, ?, ?, ... в зависимости от длины массива
 
         const query = `
             WITH ServiceCounts AS (
@@ -43,7 +45,7 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
                 JOIN sales sa 
                     ON s.client = sa.client 
                     AND s.trainer = sa.trainer
-                    AND sa.division IN (?, ?)
+                    AND sa.division IN (${placeholders}) 
                     AND sa.datetime >= s.datetime
                     AND sa.datetime <= DATE_ADD(s.datetime, INTERVAL ? DAY)
                     AND sa.final_price > 0
@@ -83,17 +85,18 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             ORDER BY trainer;
         `;
 
-        const result = await prisma.$queryRawUnsafe(
-            query, 
+        const params = [
             year, 
             month, 
             serviceName, 
-            ...saleDivisions, 
+            ...saleDivisions, // Передаём все значения из saleDivisions
             conversationDays, 
             year, 
             month, 
             serviceName
-        );
+        ];
+
+        const result = await prisma.$queryRawUnsafe(query, ...params);
 
         const serializedResult = result.map(row =>
             Object.fromEntries(
