@@ -125,13 +125,26 @@ app.post('/trainers_sales_for_month', async (req, res) => {
             return res.status(400).json({ error: 'Missing required parameters' });
         }
 
-        const placeholders = saleDivisions.map(() => '?').join(', '); // Генерируем ?, ?, ? в IN
+        const placeholders = saleDivisions.map(() => '?').join(', ');
+        
         const query = `
+            WITH FirstSales AS (
+                SELECT s.client, s.trainer, MIN(s.datetime) AS first_purchase_date
+                FROM sales s
+                GROUP BY s.client, s.trainer
+            )
             SELECT 
                 s.trainer,
                 COUNT(s.id) AS total_sales_count,
-                COALESCE(SUM(s.final_price), 0) AS total_sales_amount
+                COALESCE(SUM(s.final_price), 0) AS total_sales_amount,
+                
+                COUNT(CASE WHEN fs.first_purchase_date = s.datetime THEN 1 END) AS first_sales_count,
+                COALESCE(SUM(CASE WHEN fs.first_purchase_date = s.datetime THEN s.final_price END), 0) AS first_sales_amount,
+                
+                COUNT(CASE WHEN fs.first_purchase_date < s.datetime THEN 1 END) AS renewal_sales_count,
+                COALESCE(SUM(CASE WHEN fs.first_purchase_date < s.datetime THEN s.final_price END), 0) AS renewal_sales_amount
             FROM sales s
+            LEFT JOIN FirstSales fs ON s.client = fs.client AND s.trainer = fs.trainer
             WHERE YEAR(s.datetime) = ?
               AND MONTH(s.datetime) = ?
               AND s.division IN (${placeholders})
@@ -161,6 +174,7 @@ app.post('/trainers_sales_for_month', async (req, res) => {
         await prisma.$disconnect();
     }
 });
+
 
 
 
