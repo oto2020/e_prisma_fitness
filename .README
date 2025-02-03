@@ -1,5 +1,13 @@
-делаем отчеты ftp.sales, ftp.services
-сохраняем в .xlsx в корень
-старые перемещаем в archive xlsx
+в папке ftp должны быть отчеты ftp.sales*xlsx и ftp.sales*xlsx
 запускаем loadServices и loadSales
-далее можно выгружать отчет конверсий getConversionFT_VPT, проверив даты оказания услуг
+
+далее можно обращаться к репорт-серверу. пример запроса:
+curl --location 'http://localhost:9800/trainers_conversation_for_month' \
+--header 'Content-Type: application/json' \
+--data '{
+           "year": 2024,
+           "month": 10,
+           "serviceName": "Персональная тренировка в тренажерном зале",
+           "saleDivisions": ["Тренажерный зал", "Групповые программы"],
+           "conversationDays": 60
+         }'
