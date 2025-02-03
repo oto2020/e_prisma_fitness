@@ -117,6 +117,55 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
     }
 });
 
+app.post('/trainers_sales_for_month', async (req, res) => {
+    try {
+        const { year, month, saleDivisions } = req.body;
+
+        if (!year || !month || !saleDivisions.length) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+
+        const placeholders = saleDivisions.map(() => '?').join(', '); // Генерируем ?, ?, ? в IN
+        const query = `
+            SELECT 
+                s.trainer,
+                COUNT(s.id) AS total_sales_count,
+                COALESCE(SUM(s.final_price), 0) AS total_sales_amount
+            FROM sales s
+            WHERE YEAR(s.datetime) = ?
+              AND MONTH(s.datetime) = ?
+              AND s.division IN (${placeholders})
+            GROUP BY s.trainer
+            ORDER BY s.trainer;
+        `;
+
+        const params = [year, month, ...saleDivisions];
+
+        const result = await prisma.$queryRawUnsafe(query, ...params);
+
+        const serializedResult = result.map(row =>
+            Object.fromEntries(
+                Object.entries(row).map(([key, value]) => [
+                    key,
+                    typeof value === "bigint" ? value.toString() : value
+                ])
+            )
+        );
+
+        res.json(serializedResult);
+
+    } catch (error) {
+        console.error("Ошибка выполнения запроса:", error);
+        res.status(500).json({ error: "Ошибка выполнения запроса" });
+    } finally {
+        await prisma.$disconnect();
+    }
+});
+
+
+
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

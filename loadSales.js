@@ -34,11 +34,10 @@ async function loadSalesData(filePath) {
   console.log(`📄 Подготовлено ${salesData.length} записей.`);
 
   try {
-    // Очистка таблицы перед вставкой данных
     await prisma.sale.deleteMany({});
     console.log("✅ Все старые данные удалены.");
 
-    const batchSize = 500; // Вставка батчами по 500 записей
+    const batchSize = 500;
     for (let i = 0; i < salesData.length; i += batchSize) {
       const batch = salesData.slice(i, i + batchSize);
       console.log(`📤 Вставка записей: ${i + 1}-${i + batch.length} / ${salesData.length}`);
@@ -51,7 +50,6 @@ async function loadSalesData(filePath) {
 
     console.log(`✅ Файл ${filePath} загружен.`);
 
-    // 🔹 Удаление файла после успешной загрузки
     fs.unlink(filePath, (err) => {
       if (err) {
         console.error(`❌ Ошибка удаления файла ${filePath}:`, err);
@@ -75,34 +73,26 @@ async function processFiles() {
 
   try {
     const directoryPath = path.join(__dirname, "..", process.env.FTP_FOLDER);
+    const files = await fs.promises.readdir(directoryPath);
+    
+    const excelFiles = files.filter(file => file.startsWith('ftp.sales') && file.endsWith('.xlsx'));
 
-    fs.readdir(directoryPath, async (err, files) => {
-      if (err) {
-        console.error('❌ Ошибка чтения директории:', err);
-        isProcessing = false;
-        return;
-      }
+    if (excelFiles.length === 0) {
+      console.log("📂 Файлы для загрузки не найдены.");
+      return;
+    }
 
-      const excelFiles = files.filter(file => file.startsWith('ftp.sales') && file.endsWith('.xlsx'));
+    console.log(`🔍 Найдено ${excelFiles.length} файлов для обработки.`);
 
-      if (excelFiles.length === 0) {
-        console.log("📂 Файлы для загрузки не найдены.");
-        isProcessing = false;
-        return;
-      }
+    for (const file of excelFiles) {
+      await loadSalesData(path.join(directoryPath, file));
+    }
 
-      console.log(`🔍 Найдено ${excelFiles.length} файлов для обработки.`);
-
-      for (const file of excelFiles) {
-        await loadSalesData(path.join(directoryPath, file));
-      }
-
-      console.log('🎉 Все файлы обработаны.');
-      isProcessing = false; // Сбрасываем флаг после завершения обработки
-    });
+    console.log('🎉 Все файлы обработаны.');
   } catch (error) {
     console.error("❌ Ошибка обработки файлов:", error);
-    isProcessing = false;
+  } finally {
+    isProcessing = false; // Сбрасываем флаг после завершения обработки
   }
 }
 
