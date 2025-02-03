@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const xlsx = require('xlsx');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
 const prisma = new PrismaClient();
 let isProcessing = false; // Флаг, чтобы предотвратить повторные запуски
@@ -73,7 +74,7 @@ async function processFiles() {
   isProcessing = true; // Устанавливаем флаг обработки
 
   try {
-    const directoryPath = path.join(__dirname, "..", "ftp");
+    const directoryPath = path.join(__dirname, "..", process.env.FTP_FOLDER);
 
     fs.readdir(directoryPath, async (err, files) => {
       if (err) {
