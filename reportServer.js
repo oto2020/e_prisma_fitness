@@ -14,15 +14,15 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             year,
             month,
             serviceName,
-            saleDivisions,
+            divisions,
             conversationDays
         } = req.body;
 
-        if (!year || !month || !serviceName || !saleDivisions.length || !conversationDays) {
+        if (!year || !month || !serviceName || !divisions.length || !conversationDays) {
             return res.status(400).json({ error: 'Missing required parameters' });
         }
 
-        const placeholders = saleDivisions.map(() => '?').join(', '); // Формируем ?, ?, ?, ... в зависимости от длины массива
+        const placeholders = divisions.map(() => '?').join(', '); // Формируем ?, ?, ?, ... в зависимости от длины массива
 
         const query = `
             WITH ServiceCounts AS (
@@ -89,7 +89,7 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             year, 
             month, 
             serviceName, 
-            ...saleDivisions, // Передаём все значения из saleDivisions
+            ...divisions, // Передаём все значения из divisions
             conversationDays, 
             year, 
             month, 
@@ -119,13 +119,13 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
 
 app.post('/trainers_sales_for_month', async (req, res) => {
     try {
-        const { year, month, saleDivisions } = req.body;
+        const { year, month, divisions } = req.body;
 
-        if (!year || !month || !saleDivisions.length) {
+        if (!year || !month || !divisions.length) {
             return res.status(400).json({ error: 'Missing required parameters' });
         }
 
-        const placeholders = saleDivisions.map(() => '?').join(', ');
+        const placeholders = divisions.map(() => '?').join(', ');
         
         const query = `
             WITH FirstSales AS (
@@ -152,7 +152,7 @@ app.post('/trainers_sales_for_month', async (req, res) => {
             ORDER BY s.trainer;
         `;
 
-        const params = [year, month, ...saleDivisions];
+        const params = [year, month, ...divisions];
 
         const result = await prisma.$queryRawUnsafe(query, ...params);
 
@@ -174,6 +174,83 @@ app.post('/trainers_sales_for_month', async (req, res) => {
         await prisma.$disconnect();
     }
 });
+
+app.post('/trainers_services_for_month', async (req, res) => {
+    try {
+        const { year, month, divisions } = req.body;
+
+        if (!year || !month || !divisions.length) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+
+        const placeholders = divisions.map(() => '?').join(', ');
+        
+        const query = `
+            WITH FreeGroupServices AS (
+                SELECT trainer, COUNT(*) AS free_group_count, COALESCE(SUM(price), 0) AS free_group_amount
+                FROM services
+                WHERE trainer IS NOT NULL AND trainer <> ''
+                  AND name NOT LIKE '%МГ %'
+                  AND name NOT LIKE '%ПТ %'
+                  AND name NOT LIKE '%KIDS%'
+                  AND name NOT LIKE '%₽%'
+                  AND name NOT LIKE '%$%'
+                  AND name NOT LIKE '%СПЛИТ%'
+                  AND name NOT LIKE '%тестирование%'
+                  AND name NOT LIKE '%браслет%'
+                  AND name NOT LIKE '%соляри%'
+                  AND name NOT LIKE '%питания%'
+                  AND name NOT LIKE '%скриннинг%'
+                  AND name NOT LIKE '%доп.%'
+                  AND name NOT LIKE '%столик%'
+                  AND name NOT LIKE '%пробковый%'
+                  AND name NOT LIKE '%массаж%'
+                  AND name NOT LIKE '%липопластика%'
+                  AND name NOT LIKE '%подарочный%'
+                  AND name NOT LIKE '%сертификат%'
+                  AND BINARY name = BINARY UPPER(name)
+                  AND YEAR(datetime) = ? AND MONTH(datetime) = ?
+                  AND division IN (${placeholders})
+                GROUP BY trainer
+            )
+            SELECT 
+                s.trainer,
+                COUNT(CASE WHEN s.name LIKE '%ПТ %' OR s.name LIKE '%СПЛИТ %' THEN 1 END) AS pt_count,
+                COALESCE(SUM(CASE WHEN s.name LIKE '%ПТ %' OR s.name LIKE '%СПЛИТ %' THEN s.price END), 0) AS pt_amount,
+                COUNT(CASE WHEN s.name LIKE '%МГ %' THEN 1 END) AS mg_count,
+                COALESCE(SUM(CASE WHEN s.name LIKE '%МГ %' THEN s.price END), 0) AS mg_amount,
+                COALESCE(fg.free_group_count, 0) AS free_group_count,
+                COALESCE(fg.free_group_amount, 0) AS free_group_amount
+            FROM services s
+            LEFT JOIN FreeGroupServices fg ON s.trainer = fg.trainer
+            WHERE YEAR(s.datetime) = ? AND MONTH(s.datetime) = ?
+              AND s.division IN (${placeholders})
+            GROUP BY s.trainer
+            ORDER BY s.trainer;
+        `;
+
+        const params = [year, month, ...divisions, year, month, ...divisions];
+        
+        const result = await prisma.$queryRawUnsafe(query, ...params);
+
+        const serializedResult = result.map(row =>
+            Object.fromEntries(
+                Object.entries(row).map(([key, value]) => [
+                    key,
+                    typeof value === 'bigint' ? value.toString() : value
+                ])
+            )
+        );
+
+        res.json(serializedResult);
+    } catch (error) {
+        console.error('Ошибка выполнения запроса:', error);
+        res.status(500).json({ error: 'Ошибка выполнения запроса' });
+    } finally {
+        await prisma.$disconnect();
+    }
+});
+
 
 
 
