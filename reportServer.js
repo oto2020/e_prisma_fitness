@@ -226,6 +226,7 @@ app.post('/trainers_services_for_month', async (req, res) => {
                 FROM services
                 WHERE 
                     trainer IS NOT NULL AND trainer <> ''
+                    AND client IS NOT NULL AND client <> '' -- Исключаем записи без клиентов
                     AND name LIKE '% ₽' ESCAPE ''
                     AND name NOT LIKE '%МГ %'
                     AND name NOT LIKE '%ПТ %'
@@ -246,10 +247,12 @@ app.post('/trainers_services_for_month', async (req, res) => {
                 END), 0) AS pt_amount,
                 COUNT(DISTINCT CASE 
                     WHEN s.name LIKE '%МГ %' 
+                        AND s.client IS NOT NULL AND s.client <> '' -- Исключаем записи без клиентов
                     THEN CONCAT(s.datetime, s.name, s.trainer) 
                 END) AS mg_count,
                 COALESCE(SUM(CASE 
                     WHEN s.name LIKE '%МГ %' 
+                        AND s.client IS NOT NULL AND s.client <> '' -- Исключаем записи без клиентов
                     THEN s.price 
                 END), 0) AS mg_amount,
                 COALESCE(fg.free_group_count, 0) AS free_group_count,
@@ -290,6 +293,7 @@ app.post('/trainers_services_for_month', async (req, res) => {
         await prisma.$disconnect();
     }
 });
+
 
 
 
