@@ -218,6 +218,8 @@ app.post('/trainers_services_for_month', async (req, res) => {
                 FROM services
                 WHERE trainer IS NOT NULL AND trainer <> ''
                   AND name LIKE '% ₽' ESCAPE ''
+                  AND name NOT LIKE '%МГ %'
+                  AND name NOT LIKE '%ПТ %'
                   AND YEAR(datetime) = ? AND MONTH(datetime) = ?
                   AND division IN (${placeholders})
                 GROUP BY trainer
