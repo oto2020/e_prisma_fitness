@@ -187,49 +187,71 @@ app.post('/trainers_services_for_month', async (req, res) => {
 
         const query = `
             WITH FreeGroupServices AS (
-                SELECT trainer, COUNT(*) AS free_group_count, COALESCE(SUM(price), 0) AS free_group_amount
+                SELECT 
+                    trainer,
+                    COUNT(DISTINCT CONCAT(datetime, name, trainer)) AS free_group_count,
+                    COALESCE(SUM(price), 0) AS free_group_amount
                 FROM services
-                WHERE trainer IS NOT NULL AND trainer <> ''
-                  AND name NOT LIKE '%МГ %'
-                  AND name NOT LIKE '%ПТ %'
-                  AND name NOT LIKE '%KIDS%'
-                  AND name NOT LIKE '%₽%'
-                  AND name NOT LIKE '%$%'
-                  AND name NOT LIKE '%СПЛИТ%'
-                  AND name NOT LIKE '%тестирование%'
-                  AND name NOT LIKE '%браслет%'
-                  AND name NOT LIKE '%соляри%'
-                  AND name NOT LIKE '%питания%'
-                  AND name NOT LIKE '%скриннинг%'
-                  AND name NOT LIKE '%доп.%'
-                  AND name NOT LIKE '%столик%'
-                  AND name NOT LIKE '%пробковый%'
-                  AND name NOT LIKE '%массаж%'
-                  AND name NOT LIKE '%липопластика%'
-                  AND name NOT LIKE '%подарочный%'
-                  AND name NOT LIKE '%сертификат%'
-                  AND BINARY name = BINARY UPPER(name)
-                  AND YEAR(datetime) = ? AND MONTH(datetime) = ?
-                  AND division IN (${placeholders})
+                WHERE 
+                    trainer IS NOT NULL AND trainer <> ''
+                    AND name NOT LIKE '%МГ %'
+                    AND name NOT LIKE '%ПТ %'
+                    AND name NOT LIKE '%KIDS%'
+                    AND name NOT LIKE '%₽%'
+                    AND name NOT LIKE '%$%'
+                    AND name NOT LIKE '%СПЛИТ%'
+                    AND name NOT LIKE '%тестирование%'
+                    AND name NOT LIKE '%браслет%'
+                    AND name NOT LIKE '%соляри%'
+                    AND name NOT LIKE '%питания%'
+                    AND name NOT LIKE '%скриннинг%'
+                    AND name NOT LIKE '%доп.%'
+                    AND name NOT LIKE '%столик%'
+                    AND name NOT LIKE '%пробковый%'
+                    AND name NOT LIKE '%массаж%'
+                    AND name NOT LIKE '%липопластика%'
+                    AND name NOT LIKE '%подарочный%'
+                    AND name NOT LIKE '%сертификат%'
+                    AND BINARY name = BINARY UPPER(name)
+                    AND YEAR(datetime) = ? 
+                    AND MONTH(datetime) = ?
+                    AND division IN (${placeholders})
                 GROUP BY trainer
             ),
             GPServices AS (
-                SELECT trainer, COUNT(*) AS gp_count, COALESCE(SUM(price), 0) AS gp_amount
+                SELECT 
+                    trainer,
+                    COUNT(DISTINCT CONCAT(datetime, name, trainer)) AS gp_count,
+                    COALESCE(SUM(price), 0) AS gp_amount
                 FROM services
-                WHERE trainer IS NOT NULL AND trainer <> ''
-                  AND name LIKE '% ₽' ESCAPE ''
-                  AND name NOT LIKE '%МГ %'
-                  AND name NOT LIKE '%ПТ %'
-                  AND YEAR(datetime) = ? AND MONTH(datetime) = ?
-                  AND division IN (${placeholders})
+                WHERE 
+                    trainer IS NOT NULL AND trainer <> ''
+                    AND name LIKE '% ₽' ESCAPE ''
+                    AND name NOT LIKE '%МГ %'
+                    AND name NOT LIKE '%ПТ %'
+                    AND YEAR(datetime) = ? 
+                    AND MONTH(datetime) = ?
+                    AND division IN (${placeholders})
                 GROUP BY trainer
             )
             SELECT 
                 s.trainer,
-                COUNT(CASE WHEN s.name LIKE '%ПТ %' OR s.name LIKE '%СПЛИТ %' THEN 1 END) AS pt_count,
-                COALESCE(SUM(CASE WHEN s.name LIKE '%ПТ %' OR s.name LIKE '%СПЛИТ %' THEN s.price END), 0) AS pt_amount,
-                COUNT(CASE WHEN s.name LIKE '%МГ %' THEN 1 END) AS mg_count,
-                COALESCE(SUM(CASE WHEN s.name LIKE '%МГ %' THEN s.price END), 0) AS mg_amount,
+                COUNT(DISTINCT CASE 
+                    WHEN s.name LIKE '%ПТ %' OR s.name LIKE '%СПЛИТ %' 
+                    THEN CONCAT(s.datetime, s.name, s.trainer) 
+                END) AS pt_count,
+                COALESCE(SUM(CASE 
+                    WHEN s.name LIKE '%ПТ %' OR s.name LIKE '%СПЛИТ %' 
+                    THEN s.price 
+                END), 0) AS pt_amount,
+                COUNT(DISTINCT CASE 
+                    WHEN s.name LIKE '%МГ %' 
+                    THEN CONCAT(s.datetime, s.name, s.trainer) 
+                END) AS mg_count,
+                COALESCE(SUM(CASE 
+                    WHEN s.name LIKE '%МГ %' 
+                    THEN s.price 
+                END), 0) AS mg_amount,
                 COALESCE(fg.free_group_count, 0) AS free_group_count,
                 COALESCE(fg.free_group_amount, 0) AS free_group_amount,
                 COALESCE(gp.gp_count, 0) AS gp_count,
@@ -238,12 +260,16 @@ app.post('/trainers_services_for_month', async (req, res) => {
             LEFT JOIN FreeGroupServices fg ON s.trainer = fg.trainer
             LEFT JOIN GPServices gp ON s.trainer = gp.trainer
             WHERE YEAR(s.datetime) = ? AND MONTH(s.datetime) = ?
-              AND s.division IN (${placeholders})
+                AND s.division IN (${placeholders})
             GROUP BY s.trainer
             ORDER BY s.trainer;
         `;
 
-        const params = [year, month, ...divisions, year, month, ...divisions, year, month, ...divisions];
+        const params = [
+            year, month, ...divisions,  // Для FreeGroupServices
+            year, month, ...divisions,  // Для GPServices
+            year, month, ...divisions   // Для основного запроса
+        ];
 
         const result = await prisma.$queryRawUnsafe(query, ...params);
 
