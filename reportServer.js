@@ -15,7 +15,8 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             month,
             serviceName,
             divisions,
-            conversationDays
+            conversationDays,
+            trainerToTrainerConversation
         } = req.body;
 
         if (!year || !month || !serviceName || !divisions.length || !conversationDays) {
@@ -44,7 +45,7 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
                 FROM services s
                 JOIN sales sa 
                     ON s.client = sa.client 
-                    AND s.trainer = sa.trainer
+                    ${trainerToTrainerConversation?'AND s.trainer = sa.trainer':''}
                     AND sa.division IN (${placeholders}) 
                     AND sa.datetime >= s.datetime
                     AND sa.datetime <= DATE_ADD(s.datetime, INTERVAL ? DAY)
