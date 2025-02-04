@@ -184,7 +184,7 @@ app.post('/trainers_services_for_month', async (req, res) => {
         }
 
         const placeholders = divisions.map(() => '?').join(', ');
-        
+
         const query = `
             WITH FreeGroupServices AS (
                 SELECT trainer, COUNT(*) AS free_group_count, COALESCE(SUM(price), 0) AS free_group_amount
@@ -212,6 +212,15 @@ app.post('/trainers_services_for_month', async (req, res) => {
                   AND YEAR(datetime) = ? AND MONTH(datetime) = ?
                   AND division IN (${placeholders})
                 GROUP BY trainer
+            ),
+            GPServices AS (
+                SELECT trainer, COUNT(*) AS gp_count, COALESCE(SUM(price), 0) AS gp_amount
+                FROM services
+                WHERE trainer IS NOT NULL AND trainer <> ''
+                  AND name LIKE '% ₽' ESCAPE ''
+                  AND YEAR(datetime) = ? AND MONTH(datetime) = ?
+                  AND division IN (${placeholders})
+                GROUP BY trainer
             )
             SELECT 
                 s.trainer,
@@ -220,17 +229,20 @@ app.post('/trainers_services_for_month', async (req, res) => {
                 COUNT(CASE WHEN s.name LIKE '%МГ %' THEN 1 END) AS mg_count,
                 COALESCE(SUM(CASE WHEN s.name LIKE '%МГ %' THEN s.price END), 0) AS mg_amount,
                 COALESCE(fg.free_group_count, 0) AS free_group_count,
-                COALESCE(fg.free_group_amount, 0) AS free_group_amount
+                COALESCE(fg.free_group_amount, 0) AS free_group_amount,
+                COALESCE(gp.gp_count, 0) AS gp_count,
+                COALESCE(gp.gp_amount, 0) AS gp_amount
             FROM services s
             LEFT JOIN FreeGroupServices fg ON s.trainer = fg.trainer
+            LEFT JOIN GPServices gp ON s.trainer = gp.trainer
             WHERE YEAR(s.datetime) = ? AND MONTH(s.datetime) = ?
               AND s.division IN (${placeholders})
             GROUP BY s.trainer
             ORDER BY s.trainer;
         `;
 
-        const params = [year, month, ...divisions, year, month, ...divisions];
-        
+        const params = [year, month, ...divisions, year, month, ...divisions, year, month, ...divisions];
+
         const result = await prisma.$queryRawUnsafe(query, ...params);
 
         const serializedResult = result.map(row =>
@@ -250,9 +262,6 @@ app.post('/trainers_services_for_month', async (req, res) => {
         await prisma.$disconnect();
     }
 });
-
-
-
 
 
 
