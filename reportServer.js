@@ -28,7 +28,7 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             WITH ServiceCounts AS (
                 SELECT 
                     s.trainer,
-                    COUNT(*) AS sessions_count
+                    COUNT(*) AS sessions_count_vpt
                 FROM services s
                 WHERE YEAR(s.datetime) = ?
                   AND MONTH(s.datetime) = ?
@@ -57,8 +57,8 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             FirstSalesSummary AS (
                 SELECT 
                     fs.trainer,
-                    COUNT(fs.client) AS first_sales_count,
-                    COALESCE(SUM(sa.final_price), 0) AS total_first_sales_amount
+                    COUNT(fs.client) AS first_sales_count_vpt,
+                    COALESCE(SUM(sa.final_price), 0) AS total_first_sales_amount_vpt
                 FROM FirstSales fs
                 JOIN sales sa ON fs.first_sale_id = sa.id
                 WHERE sa.final_price > 0
@@ -66,9 +66,9 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
             )
             SELECT 
                 COALESCE(sc.trainer, fs.trainer) AS trainer,
-                COALESCE(sc.sessions_count, 0) AS sessions_count,
-                COALESCE(fs.first_sales_count, 0) AS first_sales_count,
-                COALESCE(fs.total_first_sales_amount, 0) AS total_first_sales_amount
+                COALESCE(sc.sessions_count_vpt, 0) AS sessions_count_vpt,
+                COALESCE(fs.first_sales_count_vpt, 0) AS first_sales_count_vpt,
+                COALESCE(fs.total_first_sales_amount_vpt, 0) AS total_first_sales_amount_vpt
             FROM ServiceCounts sc
             LEFT JOIN FirstSalesSummary fs ON sc.trainer = fs.trainer
 
@@ -76,9 +76,9 @@ app.post('/trainers_conversation_for_month', async (req, res) => {
 
             SELECT 
                 COALESCE(sc.trainer, fs.trainer) AS trainer,
-                COALESCE(sc.sessions_count, 0) AS sessions_count,
-                COALESCE(fs.first_sales_count, 0) AS first_sales_count,
-                COALESCE(fs.total_first_sales_amount, 0) AS total_first_sales_amount
+                COALESCE(sc.sessions_count_vpt, 0) AS sessions_count_vpt,
+                COALESCE(fs.first_sales_count_vpt, 0) AS first_sales_count_vpt,
+                COALESCE(fs.total_first_sales_amount_vpt, 0) AS total_first_sales_amount_vpt
             FROM FirstSalesSummary fs
             LEFT JOIN ServiceCounts sc ON sc.trainer = fs.trainer
 
