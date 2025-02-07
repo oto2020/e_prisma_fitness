@@ -22,6 +22,7 @@ async function loadServicesData(filePath) {
     trainer: row.trainer,
     client: row.client,
     basis: row.basis || null,
+    comment: row.comment,
     datetime: new Date(row.datetime),
     price: Number(row.price)
   }));

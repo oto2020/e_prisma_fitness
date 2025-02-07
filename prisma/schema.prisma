@@ -36,6 +36,7 @@ model Service {
   trainer   String?
   client    String?
   basis     String?
+  comment   String?
   datetime  DateTime?
   price     Float?
 
