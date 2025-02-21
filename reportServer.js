@@ -335,7 +335,7 @@ app.post('/sales-report', async (req, res) => {
                 SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Персональная тренировка в групповых программах' THEN 1 ELSE 0 END) AS new_sales_after_gp_count,
                 SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Персональная тренировка в групповых программах' THEN s.final_price ELSE 0 END) AS new_sales_after_gp_summ,
                 SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Персональная тренировка в аква зоне' THEN 1 ELSE 0 END) AS new_sales_after_aqua_count,
-                SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Персональная тренировка в аква зоне' THEN s.final_price ELSE 0 END) AS new_sales_after_ft_summ,
+                SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Персональная тренировка в аква зоне' THEN s.final_price ELSE 0 END) AS new_sales_after_aqua_summ,
                 SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Фитнес-тестирование (клубная карта)' THEN 1 ELSE 0 END) AS new_sales_after_ft_count,
                 SUM(CASE WHEN s.is_new = 1 AND s.touch_type = 'Фитнес-тестирование (клубная карта)' THEN s.final_price ELSE 0 END) AS new_sales_after_ft_summ,
                 SUM(CASE WHEN s.is_new = 1 AND s.touch_type IS NULL THEN 1 ELSE 0 END) AS new_sales_without_ft_vpt_count,
@@ -372,7 +372,6 @@ app.post('/sales-report', async (req, res) => {
         const params = [...divisions, conversationDays, ...divisions, year, month];
         const result = await prisma.$queryRawUnsafe(query, ...params);
 
-        // Преобразуем BigInt в String
         const serializedResult = JSON.parse(
             JSON.stringify(result, (key, value) =>
                 typeof value === "bigint" ? value.toString() : value
@@ -380,12 +379,12 @@ app.post('/sales-report', async (req, res) => {
         );
         
         res.json(serializedResult);
-        
     } catch (error) {
         console.error('Error executing sales report query:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 
 
 
