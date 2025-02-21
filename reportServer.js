@@ -295,6 +295,102 @@ app.post('/trainers_services_for_month', async (req, res) => {
     }
 });
 
+app.post('/trainer_sales_structure', async (req, res) => {
+    try {
+        const { year, month, divisions, conversationDays } = req.body;
+
+        if (!year || !month || !divisions.length || !conversationDays) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+
+        const placeholders = divisions.map(() => '?').join(', ');
+
+        const query = `
+            WITH FirstSales AS (
+                -- Определяем дату первой покупки клиента у тренера
+                SELECT s.client, s.trainer, MIN(s.datetime) AS first_purchase_date
+                FROM sales s
+                GROUP BY s.client, s.trainer
+            ),
+            TouchEvents AS (
+                -- Определяем последнее касание клиента в пределах conversationDays перед покупкой
+                SELECT srv.client, srv.trainer, MAX(srv.datetime) AS last_touch_date, srv.name AS touch_type
+                FROM services srv
+                WHERE srv.name IN (
+                    'Персональная тренировка в тренажерном зале',
+                    'Персональная тренировка в групповых программах',
+                    'Персональная тренировка в аква зоне',
+                    'Фитнес-тестирование (клубная карта)'
+                )
+                GROUP BY srv.client, srv.trainer, srv.name
+            )
+            SELECT 
+                s.trainer,
+                
+                -- Общее количество продаж
+                COUNT(s.id) AS total_sales_count,
+                COALESCE(SUM(s.final_price), 0) AS total_sales_summ,
+
+                -- Количество первых продаж
+                COUNT(CASE WHEN fs.first_purchase_date = s.datetime THEN 1 END) AS new_sales_count,
+                COALESCE(SUM(CASE WHEN fs.first_purchase_date = s.datetime THEN s.final_price END), 0) AS new_sales_summ,
+
+                -- Количество продлений
+                COUNT(CASE WHEN fs.first_purchase_date < s.datetime THEN 1 END) AS renewal_sales_count,
+                COALESCE(SUM(CASE WHEN fs.first_purchase_date < s.datetime THEN s.final_price END), 0) AS renewal_sales_summ,
+
+                -- Новые продажи после тренировки (учитывается conversationDays)
+                SUM(CASE 
+                    WHEN fs.first_purchase_date = s.datetime 
+                         AND te.trainer = s.trainer 
+                         AND te.last_touch_date BETWEEN DATE_SUB(s.datetime, INTERVAL ? DAY) AND s.datetime
+                    THEN 1 ELSE 0 
+                END) AS new_sales_after_touch_count,
+                
+                SUM(CASE 
+                    WHEN fs.first_purchase_date = s.datetime 
+                         AND te.trainer = s.trainer 
+                         AND te.last_touch_date BETWEEN DATE_SUB(s.datetime, INTERVAL ? DAY) AND s.datetime
+                    THEN s.final_price ELSE 0 
+                END) AS new_sales_after_touch_summ
+
+            FROM sales s
+            LEFT JOIN FirstSales fs ON s.client = fs.client AND s.trainer = fs.trainer
+            LEFT JOIN TouchEvents te ON s.client = te.client 
+
+            WHERE YEAR(s.datetime) = ?
+              AND MONTH(s.datetime) = ?
+              AND s.division IN (${placeholders})
+
+            GROUP BY s.trainer
+            ORDER BY s.trainer;
+        `;
+
+        const params = [
+            conversationDays, conversationDays, // Для проверки касания
+            year, month, ...divisions // Для основной выборки
+        ];
+
+        const result = await prisma.$queryRawUnsafe(query, ...params);
+
+        const serializedResult = result.map(row =>
+            Object.fromEntries(
+                Object.entries(row).map(([key, value]) => [
+                    key,
+                    typeof value === 'bigint' ? value.toString() : value
+                ])
+            )
+        );
+
+        res.json(serializedResult);
+
+    } catch (error) {
+        console.error('Ошибка выполнения запроса:', error);
+        res.status(500).json({ error: 'Ошибка выполнения запроса' });
+    } finally {
+        await prisma.$disconnect();
+    }
+});
 
 
 

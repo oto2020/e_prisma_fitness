@@ -42,3 +42,23 @@ model Service {
 
   @@map("services")
 }
+
+model Package {
+  id               String    @id @db.VarChar(555)
+  dateSale         DateTime?
+  dateActivation   DateTime?
+  dateClosing      DateTime?
+  name             String?
+  division         String?
+  comment          String?
+  client           String?
+  clientBirthday   DateTime?
+  clientPhone      String?
+  trainer          String?
+  price            Float?
+  count            Int?
+  dateProdl        DateTime?
+  status           String?
+
+  @@map("packages")
+}
